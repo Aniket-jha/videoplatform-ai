@@ -1,13 +1,14 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import clsx from "clsx";
 import {
   ArrowUp, BarChart3, CloudUpload, FileText, Lock, MessagesSquare, Paperclip, Pause, Play, ScrollText, SlidersHorizontal, Sparkles, UserRound, X, Zap, Clapperboard,
 } from "lucide-react";
 import {
   api, CHATS_CHANGED, DEFAULT_SETTINGS, fmtSeconds,
-  type BrandKit, type ChatDetail, type ChatMessage, type ChatMode, type ChatProject, type ChatSettings, type Style,
+  type BrandKit, type ChatDetail, type ChatMessage, type ChatMode, type ChatProject, type ChatSettings, type ProjectSummary, type Style,
 } from "@/lib/api";
 import { useSession } from "./session";
 import { Button, ErrorNote, Label, Select } from "./ui";
@@ -31,15 +32,36 @@ const MODES: { id: ChatMode; label: string; icon: React.ElementType; text: strin
 
 type Pending = { text: string; attachmentName: string | null } | null;
 
+// Per-browser conveniences: last-used settings, and the videos started from the generate screen this session.
+const SETTINGS_KEY = "rr:settings";
+const RUNS_KEY = "rr:runs";
+const readStore = <T,>(store: "local" | "session", key: string, fallback: T): T => {
+  try { const v = (store === "local" ? localStorage : sessionStorage).getItem(key); return v ? (JSON.parse(v) as T) : fallback; } catch { return fallback; }
+};
+const writeStore = (store: "local" | "session", key: string, value: unknown) => {
+  try { (store === "local" ? localStorage : sessionStorage).setItem(key, JSON.stringify(value)); } catch { /* storage unavailable */ }
+};
+const isMode = (m: string | null): m is ChatMode => m === "direct" || m === "script" || m === "chat";
+const titleFrom = (text: string, file: File | null) =>
+  (file && (!text || text.length > 80) ? file.name.replace(/\.[^.]+$/, "").replace(/[-_]+/g, " ") : text.split(/\s+/).slice(0, 8).join(" "))
+    .slice(0, 80).replace(/[\s,.;:!?-]+$/, "") || "New video";
+
+/**
+ * Generate Video. Direct and Script → Video modes are a plain generate screen
+ * (prompt or document in, live video card out). Only Chat mode is a conversation.
+ */
 export function Studio({ chatId }: { chatId?: string }) {
   const router = useRouter();
+  const params = useSearchParams();
   const { user, meta, refresh } = useSession();
   const plan = meta.plans[user.plan];
   const [chat, setChat] = useState<ChatDetail | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [projects, setProjects] = useState<Record<string, ChatProject>>({});
-  const [mode, setMode] = useState<ChatMode>("chat");
+  const queryMode = params.get("mode");
+  const [mode, setMode] = useState<ChatMode>(chatId ? "chat" : isMode(queryMode) ? queryMode : "chat");
   const [settings, setSettings] = useState<ChatSettings>(DEFAULT_SETTINGS);
+  const [runs, setRuns] = useState<string[]>([]);
   const [kits, setKits] = useState<BrandKit[]>([]);
   const [text, setText] = useState("");
   const [file, setFile] = useState<File | null>(null);
@@ -54,23 +76,38 @@ export function Studio({ chatId }: { chatId?: string }) {
 
   useEffect(() => { api<{ kits: BrandKit[] }>("/brand").then((d) => setKits(d.kits)).catch(() => {}); }, []);
 
+  // Generate screen: restore last-used settings and this session's videos.
+  useEffect(() => {
+    if (chatId) return;
+    const saved = readStore<Partial<ChatSettings>>("local", SETTINGS_KEY, {});
+    setSettings({ ...DEFAULT_SETTINGS, ...saved, style: toVideoType((saved.style ?? "motion") as Style) });
+    setRuns(readStore<string[]>("session", RUNS_KEY, []));
+  }, [chatId]);
+  useEffect(() => { if (!chatId && isMode(queryMode)) setMode(queryMode); }, [chatId, queryMode]);
+
+  const loadRuns = useCallback(async (ids: string[]) => {
+    const found = await Promise.all(ids.map((id) => api<{ project: ProjectSummary }>(`/projects/${id}`).then((d) => d.project, () => null)));
+    setProjects(Object.fromEntries(found.flatMap((p) => (p ? [[p.id, p as ChatProject]] : []))));
+  }, []);
+  useEffect(() => { if (!chatId && runs.length) void loadRuns(runs); }, [chatId, runs, loadRuns]);
+
   const load = useCallback(async () => {
-    if (!chatId) return null;
+    if (!chatId) { await loadRuns(runs); return null; }
     const d = await api<{ chat: ChatDetail; messages: ChatMessage[]; projects: Record<string, ChatProject> }>(`/chats/${chatId}`);
     setChat(d.chat);
     setMessages(d.messages);
     setProjects(d.projects);
     return d;
-  }, [chatId]);
+  }, [chatId, runs, loadRuns]);
 
-  // First load picks up the chat's saved mode and settings.
+  // First load picks up the chat's saved settings.
   useEffect(() => {
     if (!chatId) return;
     load().then((d) => {
       // Older chats may hold retired styles (hybrid, voice-over); show them as motion graphics.
-      if (d) { setMode(d.chat.mode); setSettings({ ...d.chat.settings, style: toVideoType(d.chat.settings.style) }); }
+      if (d) setSettings({ ...d.chat.settings, style: toVideoType(d.chat.settings.style) });
     }).catch(() => setError("Couldn't load this chat."));
-  }, [chatId, load]);
+  }, [chatId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Poll while any video in the thread is still working.
   const working = Object.values(projects).some((p) => isWorking(p.status));
@@ -84,10 +121,20 @@ export function Studio({ chatId }: { chatId?: string }) {
 
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" }); }, [messages.length, pending, projects]);
 
-  function persist(patch: { mode?: ChatMode; settings?: ChatSettings }) {
+  function persist(patch: { settings?: ChatSettings }) {
     if (chatId) void api(`/chats/${chatId}`, { method: "PATCH", json: patch }).catch(() => {});
+    else if (patch.settings) writeStore("local", SETTINGS_KEY, patch.settings);
   }
-  const changeMode = (m: ChatMode) => { setMode(m); persist({ mode: m }); taRef.current?.focus(); };
+  const changeMode = (m: ChatMode) => {
+    if (chatId) {
+      // Leaving a conversation for a non-chat mode opens the generate screen.
+      if (m !== "chat") router.push(`/app?mode=${m}`);
+      return;
+    }
+    setMode(m);
+    router.replace(`/app?mode=${m}`, { scroll: false });
+    taRef.current?.focus();
+  };
   const changeSettings = (patch: Partial<ChatSettings>) => {
     const next = { ...settings, ...patch };
     setSettings(next);
@@ -100,11 +147,12 @@ export function Studio({ chatId }: { chatId?: string }) {
   async function send() {
     const body = text.trim();
     if (!body && !file) return;
+    if (!chatId && mode !== "chat") return startVideo(body);
     setError("");
     setPending({ text: body, attachmentName: file?.name ?? null });
     const fd = new FormData();
     fd.append("text", body);
-    fd.append("mode", mode);
+    fd.append("mode", "chat");
     fd.append("settings", JSON.stringify(settings));
     if (file) fd.append("file", file);
     setText("");
@@ -129,6 +177,34 @@ export function Studio({ chatId }: { chatId?: string }) {
     }
   }
 
+  /** Direct / Script → Video: create the project straight away, no conversation. */
+  async function startVideo(body: string) {
+    setError("");
+    setGenerating(true);
+    const fd = new FormData();
+    const fields: Record<string, string> = {
+      title: titleFrom(body, file), mode: mode === "direct" ? "direct" : "guided", style: settings.style, theme: settings.theme,
+      aspect: settings.aspect, voice: settings.voice, targetSeconds: String(settings.targetSeconds), captions: String(settings.captions),
+    };
+    if (settings.brandKitId) fields.brandKitId = settings.brandKitId;
+    Object.entries(fields).forEach(([k, v]) => fd.append(k, v));
+    if (body) fd.append("text", body);
+    if (file) fd.append("file", file);
+    try {
+      const { project } = await api<{ project: ProjectSummary }>("/projects", { method: "POST", body: fd });
+      const next = [project.id, ...runs];
+      setRuns(next);
+      writeStore("session", RUNS_KEY, next);
+      setProjects((p) => ({ ...p, [project.id]: project as ChatProject }));
+      setText("");
+      setFile(null);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setGenerating(false);
+    }
+  }
+
   async function generate(videoMode: "direct" | "guided") {
     if (!chatId) return;
     setGenerating(true);
@@ -144,7 +220,10 @@ export function Studio({ chatId }: { chatId?: string }) {
     }
   }
 
-  const empty = !chatId && !pending;
+  const generateView = !chatId && mode !== "chat";
+  const empty = !chatId && !pending && !(generateView && runs.length);
+  const headline = mode === "chat" ? "Talk to me or upload a document to generate a video"
+    : mode === "direct" ? "Describe your video or upload a document" : "Upload a document or describe your video. We'll write the script first";
   const current = MODES.find((m) => m.id === mode)!;
   // Offer "Generate video" after a chat reply, until a video is started from it.
   const last = messages.at(-1);
@@ -188,7 +267,7 @@ export function Studio({ chatId }: { chatId?: string }) {
               <button onClick={() => fileRef.current?.click()} className="group" aria-label="Upload a document">
                 <CloudUpload className="size-24 text-[#6b6b6b] transition group-hover:scale-105 group-hover:text-brand" strokeWidth={1.5} />
               </button>
-              <p className="mt-4 text-xl font-semibold text-[#6b6b6b] sm:text-2xl">Talk to me or upload a document to generate a video</p>
+              <p className="mt-4 max-w-2xl text-xl font-semibold text-[#6b6b6b] sm:text-2xl">{headline}</p>
               <div className="mt-10 grid w-full max-w-3xl gap-3 sm:grid-cols-3">
                 {MODES.map((m) => (
                   <button key={m.id} onClick={() => changeMode(m.id)} className={clsx(
@@ -201,6 +280,14 @@ export function Studio({ chatId }: { chatId?: string }) {
                   </button>
                 ))}
               </div>
+            </div>
+          ) : generateView ? (
+            <div className="mx-auto max-w-3xl space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold uppercase tracking-wider text-muted">Your videos</h3>
+                <Link href="/app/media" className="text-sm font-medium text-brand hover:underline">See all in My Media</Link>
+              </div>
+              {runs.map((id) => projects[id] && <ProjectCard key={id} p={projects[id]} onChanged={load} />)}
             </div>
           ) : (
             <div className="mx-auto max-w-3xl space-y-5">
@@ -273,7 +360,7 @@ export function Studio({ chatId }: { chatId?: string }) {
                 <button onClick={() => fileRef.current?.click()} className="rounded-lg p-2 hover:bg-white hover:text-brand" title="Attach a document"><Paperclip className="size-5" /></button>
                 <button onClick={() => fileRef.current?.click()} className="hidden rounded-lg p-2 hover:bg-white hover:text-brand sm:block" title="Upload PDF, DOCX, Markdown or TXT"><FileText className="size-5" /></button>
                 <button onClick={() => setShowSettings((s) => !s)} className={clsx("rounded-lg p-2 hover:bg-white hover:text-brand", showSettings && "bg-white text-brand")} title="Video settings"><SlidersHorizontal className="size-5" /></button>
-                <button onClick={send} disabled={!!pending || (!text.trim() && !file)} className="ml-1 grid size-9 place-items-center rounded-xl bg-brand text-white transition hover:bg-brand-hover disabled:opacity-40" aria-label="Send">
+                <button onClick={send} disabled={!!pending || generating || (!text.trim() && !file)} className="ml-1 grid size-9 place-items-center rounded-xl bg-brand text-white transition hover:bg-brand-hover disabled:opacity-40" aria-label="Send">
                   <ArrowUp className="size-5" />
                 </button>
               </div>
