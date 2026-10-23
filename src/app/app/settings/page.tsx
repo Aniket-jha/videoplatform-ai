@@ -1,0 +1,34 @@
+"use client";
+import { BrainCircuit, CreditCard, Film, Mic, UserRound } from "lucide-react";
+import { useSession } from "@/components/session";
+import { Badge, Card } from "@/components/ui";
+
+export default function Settings() {
+  const { meta } = useSession();
+  const i = meta.integrations;
+  const rows = [
+    { icon: BrainCircuit, name: "Claude", role: "Reads documents, writes scripts and storyboards", on: i.claude, env: "ANTHROPIC_API_KEY", fallback: "Offline heuristic writer" },
+    { icon: Mic, name: "ElevenLabs", role: "Studio voiceover (most realistic)", on: i.elevenlabs, env: "ELEVENLABS_API_KEY", fallback: i.neuralVoice ? "Kokoro neural voice, running locally (free)" : i.macSay ? "macOS system voice" : "Silent, timed by word count" },
+    { icon: UserRound, name: "HeyGen", role: "AI presenter for Avatar and Hybrid styles", on: i.heygen, env: "HEYGEN_API_KEY + HEYGEN_AVATAR_ID", fallback: "Animated presenter card" },
+    { icon: Film, name: "Google Veo", role: "Cinematic B-roll for Hybrid and Cinematic styles", on: i.veo, env: "GEMINI_API_KEY", fallback: "Animated motion backgrounds" },
+    { icon: CreditCard, name: "Stripe", role: "Subscriptions and checkout", on: i.stripe, env: "STRIPE_SECRET_KEY + price IDs", fallback: "Dev-mode plan switching" },
+  ];
+  return (
+    <div className="mx-auto max-w-4xl">
+      <h1 className="font-display text-3xl font-bold tracking-tight">Integrations</h1>
+      <p className="mt-1 text-muted">Providers behind each pipeline step. Configure them in <code className="rounded bg-surface-2 px-1.5 py-0.5 text-xs">server/.env</code> and restart the API.</p>
+      <Card className="mt-8 divide-y divide-line">
+        {rows.map((r) => (
+          <div key={r.name} className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center">
+            <div className="grid size-10 shrink-0 place-items-center rounded-xl border border-line-strong bg-surface-2"><r.icon className="size-5 text-brand" /></div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2"><p className="font-medium">{r.name}</p>{r.on ? <Badge tone="success">Connected</Badge> : <Badge tone="warn">Using fallback</Badge>}</div>
+              <p className="text-sm text-muted">{r.role}</p>
+              {!r.on && <p className="mt-1 text-xs text-muted">Now: {r.fallback}. Set <code className="text-brand">{r.env}</code> to enable.</p>}
+            </div>
+          </div>
+        ))}
+      </Card>
+    </div>
+  );
+}
