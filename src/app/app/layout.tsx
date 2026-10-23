@@ -3,13 +3,18 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import clsx from "clsx";
-import { CirclePlay, CreditCard, Images, LogOut, Menu, MessageSquare, Palette, Plus, Settings2, X } from "lucide-react";
+import { CreditCard, Images, LogOut, Menu, MessageSquare, MessagesSquare, Palette, Plus, Settings2, Wrench, X, Zap } from "lucide-react";
 import { SessionProvider, useSession } from "@/components/session";
 import { Button, Logo } from "@/components/ui";
 import { api, CHATS_CHANGED, type ChatSummary } from "@/lib/api";
 
+// The three ways to make a video, then the workspace pages.
+const create = [
+  { href: "/app/direct", label: "Direct Video", icon: Zap },
+  { href: "/app/diy", label: "DIY Video", icon: Wrench },
+  { href: "/app/chat", label: "Chat", icon: MessagesSquare },
+];
 const nav = [
-  { href: "/app", label: "Generate Video", icon: CirclePlay },
   { href: "/app/media", label: "My Media", icon: Images },
   { href: "/app/brand", label: "Brand Kits", icon: Palette },
   { href: "/app/billing", label: "Plan & Credits", icon: CreditCard },
@@ -52,7 +57,7 @@ function Shell({ children }: { children: React.ReactNode }) {
             <Link href="/app/billing" className="hidden rounded-full border border-line bg-surface-2 px-3 py-1.5 text-xs font-medium text-muted hover:text-fg sm:block">
               {user.creditsSeconds.toLocaleString()} credits
             </Link>
-            <Button href="/app" size="sm" className="h-9"><Plus className="size-4" /><span className="hidden sm:inline">New video</span></Button>
+            <Button href="/app/direct" size="sm" className="h-9"><Plus className="size-4" /><span className="hidden sm:inline">New video</span></Button>
             <div className="bg-brand-gradient grid size-9 place-items-center rounded-full text-sm font-semibold text-white" title={user.email}>{user.name[0]?.toUpperCase()}</div>
           </div>
         </header>
@@ -74,7 +79,7 @@ function Sidebar() {
     return () => window.removeEventListener(CHATS_CHANGED, load);
   }, []);
 
-  const active = (href: string) => (href === "/app" ? path === "/app" : path.startsWith(href) || (href === "/app/media" && path.startsWith("/app/projects")));
+  const active = (href: string) => path.startsWith(href) || (href === "/app/media" && path.startsWith("/app/projects"));
 
   async function logout() {
     await api("/auth/logout", { method: "POST" });
@@ -83,18 +88,13 @@ function Sidebar() {
 
   return (
     <>
-      <nav className="mt-8 space-y-1.5">
-        {nav.map((n) => (
-          <Link key={n.href} href={n.href} className={clsx(
-            "flex items-center gap-3.5 rounded-xl px-4 py-3 text-[15px] font-medium transition",
-            active(n.href) ? "bg-[#1f0a9e] shadow-lg shadow-indigo-950/30" : "text-white/85 hover:bg-white/10 hover:text-white",
-          )}>
-            <n.icon className="size-5" /> {n.label}
-          </Link>
-        ))}
+      <nav className="mt-7 space-y-1">
+        {create.map((n) => <NavItem key={n.href} {...n} on={active(n.href)} />)}
+        <div className="!my-4 border-t border-white/15" />
+        {nav.map((n) => <NavItem key={n.href} {...n} on={active(n.href)} />)}
       </nav>
 
-      <div className="mt-8 flex min-h-0 flex-1 flex-col">
+      <div className="mt-6 flex min-h-0 flex-1 flex-col">
         <p className="border-b border-white/20 px-1 pb-2 text-xs font-medium uppercase tracking-wider text-white/70">Chats history</p>
         <div className="-mx-1 mt-2 flex-1 space-y-0.5 overflow-y-auto px-1 [scrollbar-width:thin]">
           {chats.length === 0 && <p className="px-1 py-2 text-sm text-white/60">Your conversations will appear here.</p>}
@@ -114,5 +114,16 @@ function Sidebar() {
         <LogOut className="size-5" /> Logout
       </button>
     </>
+  );
+}
+
+function NavItem({ href, label, icon: Icon, on }: { href: string; label: string; icon: React.ElementType; on: boolean }) {
+  return (
+    <Link href={href} className={clsx(
+      "flex items-center gap-3.5 rounded-xl px-4 py-2.5 text-[15px] font-medium transition",
+      on ? "bg-[#1f0a9e] shadow-lg shadow-indigo-950/30" : "text-white/85 hover:bg-white/10 hover:text-white",
+    )}>
+      <Icon className="size-5" /> {label}
+    </Link>
   );
 }

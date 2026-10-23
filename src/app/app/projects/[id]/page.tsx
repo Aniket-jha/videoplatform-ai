@@ -74,7 +74,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
             <StatusBadge status={p.status} />
           </div>
           <p className="mt-1 flex flex-wrap items-center gap-x-2 text-sm text-muted">
-            <FileText className="size-3.5" /> {p.docName} · {p.mode === "guided" ? "Script → Video" : "Direct"} · {p.style} · {p.aspect} · {p.brand ? `Brand: ${p.brand.name}` : p.theme}
+            <FileText className="size-3.5" /> {p.docName} · {p.mode === "guided" ? "DIY video" : "Direct video"} · {p.style} · {p.aspect} · {p.brand ? `Brand: ${p.brand.name}` : p.theme}
           </p>
         </div>
         <div className="flex gap-2">

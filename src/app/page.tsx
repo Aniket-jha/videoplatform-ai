@@ -20,7 +20,7 @@ const styles = [
 const faqs = [
   { q: "What documents can I upload?", a: "PDF, Word (.docx), Markdown, plain text and CSV up to 25 MB. You can also paste text directly." },
   { q: "How do credits work?", a: "One credit is one second of finished video in the animated style. Presenter, hybrid and cinematic styles use more credits per second because they cost more to generate." },
-  { q: "Can I edit before it renders?", a: "Yes. Guided mode pauses after the script and after the storyboard so you can edit every line and scene before any rendering credits are spent." },
+  { q: "Can I edit before it renders?", a: "Yes. DIY Video pauses after the script and after the storyboard so you can edit every line and scene before any rendering credits are spent." },
   { q: "Are my numbers safe?", a: "The script writer is instructed to stay faithful to your document and keep figures exact. Data visuals are rendered from real values, not generated pixels, so charts are always sharp and correct." },
 ];
 
@@ -74,14 +74,14 @@ export default function Landing() {
               </div>
               <h3 className="mt-5 font-semibold">{s.title}</h3>
               <p className="mt-1.5 text-sm text-muted">{s.text}</p>
-              {s.review && <span className="mt-4 inline-flex items-center gap-1.5 text-xs font-medium text-amber-600"><Eye className="size-3.5" /> Review point in Guided mode</span>}
+              {s.review && <span className="mt-4 inline-flex items-center gap-1.5 text-xs font-medium text-amber-600"><Eye className="size-3.5" /> Review point in DIY Video</span>}
             </Card>
           ))}
         </div>
         <div className="mt-6 grid gap-4 md:grid-cols-3">
           {[
             { icon: Zap, title: "Direct video", text: "Send a topic or document and walk away. Every step runs automatically and the finished MP4 lands in your chat." },
-            { icon: ShieldCheck, title: "Script → Video", text: "Edit the voiceover, swap visuals and fix numbers before rendering. Nothing is charged until you approve." },
+            { icon: ShieldCheck, title: "DIY Video", text: "Edit the voiceover, swap visuals and fix numbers before rendering. Nothing is charged until you approve." },
             { icon: MessagesSquare, title: "Chat", text: "Talk through audience, key points and tone with the assistant, then turn the whole conversation into a video." },
           ].map((m) => (
             <Card key={m.title} className="p-6">

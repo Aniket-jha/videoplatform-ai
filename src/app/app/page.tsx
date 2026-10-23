@@ -1,7 +1,7 @@
-"use client";
-import { Suspense } from "react";
-import { Studio } from "@/components/studio";
+import { redirect } from "next/navigation";
 
-export default function Generate() {
-  return <Suspense><Studio /></Suspense>;
+// Generate Video now lives on three pages; keep old ?mode= links working.
+export default async function AppHome({ searchParams }: { searchParams: Promise<{ mode?: string }> }) {
+  const { mode } = await searchParams;
+  redirect(mode === "chat" ? "/app/chat" : mode === "script" ? "/app/diy" : "/app/direct");
 }

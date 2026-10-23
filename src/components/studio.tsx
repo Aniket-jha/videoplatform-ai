@@ -1,10 +1,10 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import clsx from "clsx";
 import {
-  ArrowUp, BarChart3, CloudUpload, FileText, Lock, MessagesSquare, Paperclip, Pause, Play, ScrollText, SlidersHorizontal, Sparkles, UserRound, X, Zap, Clapperboard,
+  ArrowUp, BarChart3, CloudUpload, FileText, Lock, Paperclip, Pause, Play, ScrollText, SlidersHorizontal, Sparkles, UserRound, X, Clapperboard,
 } from "lucide-react";
 import {
   api, CHATS_CHANGED, DEFAULT_SETTINGS, fmtSeconds,
@@ -24,42 +24,51 @@ const TABS: { id: VideoType; label: string; icon: React.ElementType }[] = [
 ];
 const toVideoType = (s: Style): VideoType => (s === "cinematic" || s === "avatar" ? s : "motion");
 
-const MODES: { id: ChatMode; label: string; icon: React.ElementType; text: string; placeholder: string }[] = [
-  { id: "direct", label: "Direct video", icon: Zap, text: "Send a topic or document and get a finished video, start to finish.", placeholder: "Describe the video, paste text, or attach a document…" },
-  { id: "script", label: "Script → Video", icon: ScrollText, text: "Review and edit the script and storyboard before anything renders.", placeholder: "What should the video cover? Attach a document to start from it…" },
-  { id: "chat", label: "Chat", icon: MessagesSquare, text: "Talk it through with the assistant, then turn the conversation into a video.", placeholder: "Hi! Tell me how we can maximise your video generation…" },
-];
+// Each mode is its own page in the sidebar: Direct Video, DIY Video, Chat.
+const MODES: Record<ChatMode, { headline: string; text: string; placeholder: string }> = {
+  direct: {
+    headline: "Describe your video or upload a document",
+    text: "We'll write, voice and render the whole video for you, start to finish.",
+    placeholder: "Describe the video, paste text, or attach a document…",
+  },
+  script: {
+    headline: "Build your video step by step",
+    text: "We'll write the script first. You edit the script and every scene before anything renders.",
+    placeholder: "What should the video cover? Attach a document to start from it…",
+  },
+  chat: {
+    headline: "Talk to me or upload a document to generate a video",
+    text: "Chat it through with the assistant, then turn the conversation into a video.",
+    placeholder: "Hi! Tell me how we can maximise your video generation…",
+  },
+};
 
 type Pending = { text: string; attachmentName: string | null } | null;
 
 // Per-browser conveniences: last-used settings, and the videos started from the generate screen this session.
 const SETTINGS_KEY = "rr:settings";
-const RUNS_KEY = "rr:runs";
+const runsKey = (mode: ChatMode) => `rr:runs:${mode}`;
 const readStore = <T,>(store: "local" | "session", key: string, fallback: T): T => {
   try { const v = (store === "local" ? localStorage : sessionStorage).getItem(key); return v ? (JSON.parse(v) as T) : fallback; } catch { return fallback; }
 };
 const writeStore = (store: "local" | "session", key: string, value: unknown) => {
   try { (store === "local" ? localStorage : sessionStorage).setItem(key, JSON.stringify(value)); } catch { /* storage unavailable */ }
 };
-const isMode = (m: string | null): m is ChatMode => m === "direct" || m === "script" || m === "chat";
 const titleFrom = (text: string, file: File | null) =>
   (file && (!text || text.length > 80) ? file.name.replace(/\.[^.]+$/, "").replace(/[-_]+/g, " ") : text.split(/\s+/).slice(0, 8).join(" "))
     .slice(0, 80).replace(/[\s,.;:!?-]+$/, "") || "New video";
 
 /**
- * Generate Video. Direct and Script → Video modes are a plain generate screen
- * (prompt or document in, live video card out). Only Chat mode is a conversation.
+ * Direct and DIY Video are a plain generate screen (prompt or document in, live
+ * video card out). Chat is a conversation, saved in the sidebar's history.
  */
-export function Studio({ chatId }: { chatId?: string }) {
+export function Studio({ mode, chatId }: { mode: ChatMode; chatId?: string }) {
   const router = useRouter();
-  const params = useSearchParams();
   const { user, meta, refresh } = useSession();
   const plan = meta.plans[user.plan];
   const [chat, setChat] = useState<ChatDetail | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [projects, setProjects] = useState<Record<string, ChatProject>>({});
-  const queryMode = params.get("mode");
-  const [mode, setMode] = useState<ChatMode>(chatId ? "chat" : isMode(queryMode) ? queryMode : "chat");
   const [settings, setSettings] = useState<ChatSettings>(DEFAULT_SETTINGS);
   const [runs, setRuns] = useState<string[]>([]);
   const [kits, setKits] = useState<BrandKit[]>([]);
@@ -81,9 +90,8 @@ export function Studio({ chatId }: { chatId?: string }) {
     if (chatId) return;
     const saved = readStore<Partial<ChatSettings>>("local", SETTINGS_KEY, {});
     setSettings({ ...DEFAULT_SETTINGS, ...saved, style: toVideoType((saved.style ?? "motion") as Style) });
-    setRuns(readStore<string[]>("session", RUNS_KEY, []));
-  }, [chatId]);
-  useEffect(() => { if (!chatId && isMode(queryMode)) setMode(queryMode); }, [chatId, queryMode]);
+    if (mode !== "chat") setRuns(readStore<string[]>("session", runsKey(mode), []));
+  }, [chatId, mode]);
 
   const loadRuns = useCallback(async (ids: string[]) => {
     const found = await Promise.all(ids.map((id) => api<{ project: ProjectSummary }>(`/projects/${id}`).then((d) => d.project, () => null)));
@@ -125,16 +133,7 @@ export function Studio({ chatId }: { chatId?: string }) {
     if (chatId) void api(`/chats/${chatId}`, { method: "PATCH", json: patch }).catch(() => {});
     else if (patch.settings) writeStore("local", SETTINGS_KEY, patch.settings);
   }
-  const changeMode = (m: ChatMode) => {
-    if (chatId) {
-      // Leaving a conversation for a non-chat mode opens the generate screen.
-      if (m !== "chat") router.push(`/app?mode=${m}`);
-      return;
-    }
-    setMode(m);
-    router.replace(`/app?mode=${m}`, { scroll: false });
-    taRef.current?.focus();
-  };
+
   const changeSettings = (patch: Partial<ChatSettings>) => {
     const next = { ...settings, ...patch };
     setSettings(next);
@@ -177,7 +176,7 @@ export function Studio({ chatId }: { chatId?: string }) {
     }
   }
 
-  /** Direct / Script → Video: create the project straight away, no conversation. */
+  /** Direct / DIY Video: create the project straight away, no conversation. */
   async function startVideo(body: string) {
     setError("");
     setGenerating(true);
@@ -194,7 +193,7 @@ export function Studio({ chatId }: { chatId?: string }) {
       const { project } = await api<{ project: ProjectSummary }>("/projects", { method: "POST", body: fd });
       const next = [project.id, ...runs];
       setRuns(next);
-      writeStore("session", RUNS_KEY, next);
+      writeStore("session", runsKey(mode), next);
       setProjects((p) => ({ ...p, [project.id]: project as ChatProject }));
       setText("");
       setFile(null);
@@ -222,9 +221,8 @@ export function Studio({ chatId }: { chatId?: string }) {
 
   const generateView = !chatId && mode !== "chat";
   const empty = !chatId && !pending && !(generateView && runs.length);
-  const headline = mode === "chat" ? "Talk to me or upload a document to generate a video"
-    : mode === "direct" ? "Describe your video or upload a document" : "Upload a document or describe your video. We'll write the script first";
-  const current = MODES.find((m) => m.id === mode)!;
+
+  const current = MODES[mode];
   // Offer "Generate video" after a chat reply, until a video is started from it.
   const last = messages.at(-1);
   const chatHasReplies = mode === "chat" && last?.role === "assistant" && last.kind === "text";
@@ -267,19 +265,10 @@ export function Studio({ chatId }: { chatId?: string }) {
               <button onClick={() => fileRef.current?.click()} className="group" aria-label="Upload a document">
                 <CloudUpload className="size-24 text-[#6b6b6b] transition group-hover:scale-105 group-hover:text-brand" strokeWidth={1.5} />
               </button>
-              <p className="mt-4 max-w-2xl text-xl font-semibold text-[#6b6b6b] sm:text-2xl">{headline}</p>
-              <div className="mt-10 grid w-full max-w-3xl gap-3 sm:grid-cols-3">
-                {MODES.map((m) => (
-                  <button key={m.id} onClick={() => changeMode(m.id)} className={clsx(
-                    "rounded-2xl border p-4 text-left transition",
-                    mode === m.id ? "border-brand/40 bg-indigo-50/60 ring-4 ring-brand/8" : "border-line hover:border-line-strong hover:bg-surface-2",
-                  )}>
-                    <m.icon className={clsx("size-5", mode === m.id ? "text-brand" : "text-muted")} />
-                    <p className="mt-2.5 text-sm font-semibold">{m.label}</p>
-                    <p className="mt-1 text-xs leading-relaxed text-muted">{m.text}</p>
-                  </button>
-                ))}
-              </div>
+              <p className="mt-4 max-w-2xl text-xl font-semibold text-[#6b6b6b] sm:text-2xl">{current.headline}</p>
+              <p className="mt-2 max-w-xl text-sm text-muted">{current.text}</p>
+              <Button variant="secondary" className="mt-6" onClick={() => fileRef.current?.click()}><Paperclip className="size-4" /> Upload a document</Button>
+              <p className="mt-2 text-xs text-muted">PDF, DOCX, Markdown, TXT or CSV · or just type below</p>
             </div>
           ) : generateView ? (
             <div className="mx-auto max-w-3xl space-y-4">
@@ -312,7 +301,7 @@ export function Studio({ chatId }: { chatId?: string }) {
                     <p className="text-sm font-semibold">Ready to make it?</p>
                     <p className="text-xs text-muted">Turns this conversation into a {meta.styles[settings.style].name.toLowerCase()} · ≈ {credits.toLocaleString()} credits</p>
                   </div>
-                  <Button size="sm" variant="secondary" loading={generating} onClick={() => generate("guided")}><ScrollText className="size-4" /> Script first</Button>
+                  <Button size="sm" variant="secondary" loading={generating} onClick={() => generate("guided")}><ScrollText className="size-4" /> DIY: review first</Button>
                   <Button size="sm" loading={generating} onClick={() => generate("direct")}><Clapperboard className="size-4" /> Generate video</Button>
                 </div>
               )}
@@ -325,19 +314,6 @@ export function Studio({ chatId }: { chatId?: string }) {
         <div className="sticky bottom-0 z-10 rounded-b-2xl border-t border-line bg-white p-3 sm:p-5">
           <div className="mx-auto max-w-5xl">
             {error && <div className="mb-3"><ErrorNote>{error}</ErrorNote></div>}
-            <div className="mb-2.5 flex flex-wrap items-center gap-2">
-              <div className="inline-flex rounded-xl border border-line bg-surface-2 p-1">
-                {MODES.map((m) => (
-                  <button key={m.id} onClick={() => changeMode(m.id)} className={clsx(
-                    "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition sm:text-sm",
-                    mode === m.id ? "bg-white text-brand shadow-sm" : "text-muted hover:text-fg",
-                  )}>
-                    <m.icon className="size-3.5" /> {m.label}
-                  </button>
-                ))}
-              </div>
-              <span className="hidden text-xs text-muted md:inline">{current.text}</span>
-            </div>
 
             {file && (
               <div className="mb-2 inline-flex items-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-sm text-brand">

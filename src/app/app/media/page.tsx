@@ -36,7 +36,7 @@ export default function Media() {
   return (
     <div className="space-y-6">
       <Card className="p-5 sm:p-6">
-        <PageTitle title="My Media" text="Every video you've generated, in one place." action={<Button href="/app"><Plus className="size-4" /> New video</Button>} />
+        <PageTitle title="My Media" text="Every video you've generated, in one place." action={<Button href="/app/direct"><Plus className="size-4" /> New video</Button>} />
         <div className="mt-6 grid gap-3 sm:grid-cols-3">
           <Stat label="Videos made" value={String(done.length)} icon={Film} />
           <Stat label="Minutes produced" value={fmtSeconds(totalSec)} icon={Clapperboard} />
@@ -58,7 +58,7 @@ export default function Media() {
           <div className="bg-brand-gradient grid size-14 place-items-center rounded-2xl"><FileText className="size-6 text-white" /></div>
           <h3 className="mt-5 text-lg font-semibold">{projects.length ? "Nothing in this filter" : "No videos yet"}</h3>
           <p className="mt-1 max-w-sm text-sm text-muted">Chat with the assistant or upload a document and your videos will show up here.</p>
-          <Button href="/app" className="mt-6"><Plus className="size-4" /> Generate a video</Button>
+          <Button href="/app/direct" className="mt-6"><Plus className="size-4" /> Generate a video</Button>
         </Card>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
