@@ -26,6 +26,10 @@ npm run sync:remotion
 
 It expects the backend checked out at `../server`; otherwise set `REMOTION_SRC=/path/to/backend/remotion`.
 
+## Deploy
+
+See [DEPLOYMENT.md in the backend repo](https://github.com/Aniket-jha/videoplatform-aibackend/blob/main/DEPLOYMENT.md). In short: import this repo into Vercel and set `API_URL` to your API's URL before the first build.
+
 ## Run locally
 
 Start the backend first (port 4000), then:

@@ -147,7 +147,7 @@ const SceneShell: React.FC<{ scene: RenderScene; theme: Theme; props: RenderProp
   const { durationInFrames, width, height } = useVideoConfig();
   const portrait = height > width;
   const showPresenter = props.style === "avatar" || (props.style === "hybrid" && !scene.brollUrl);
-  // Footage (Veo or stock) wins over a still photo.
+  // Footage (AI or stock) wins over a still photo.
   const media = scene.brollUrl ? { src: scene.brollUrl, isVideo: true } : scene.imageUrl ? { src: scene.imageUrl, isVideo: false } : null;
   // A scene's own layout (editor) wins; older projects: cinematic footage rendered full-screen.
   const look = scene.layout && scene.layout !== "auto" ? scene.layout

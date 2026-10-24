@@ -10,16 +10,22 @@ const TYPE_COLOR: Record<string, string> = {
   bar_chart: "bg-sky-500", quote: "bg-amber-500", timeline: "bg-emerald-500", comparison: "bg-teal-500",
 };
 
+export type MenuTarget =
+  | { kind: "scene"; id: string } | { kind: "overlay"; id: string } | { kind: "music" }
+  | { kind: "track"; track: "scenes" | "text" | "music"; time: number };
+
 type Props = {
   doc: Doc; time: number; playing: boolean; selection: Selection;
   onSeek: (sec: number) => void; onTogglePlay: () => void; onSelect: (s: Selection) => void;
   onCommit: (fn: (d: Doc) => Doc, group?: string) => void;
   onAddScene: () => void; onAddText: () => void; onAddMusic: () => void;
+  onMenu: (e: React.MouseEvent, target: MenuTarget) => void;
 };
 
 /** Drag helper: calls onMove with the horizontal delta in seconds until the pointer is released. */
 function useDrag(pps: number) {
   return (e: React.PointerEvent, onMove: (dSec: number) => void) => {
+    if (e.button !== 0) return; // right-click opens the menu instead
     e.preventDefault();
     e.stopPropagation();
     const x0 = e.clientX;
@@ -30,7 +36,7 @@ function useDrag(pps: number) {
   };
 }
 
-export function Timeline({ doc, time, playing, selection, onSeek, onTogglePlay, onSelect, onCommit, onAddScene, onAddText, onAddMusic }: Props) {
+export function Timeline({ doc, time, playing, selection, onSeek, onTogglePlay, onSelect, onCommit, onAddScene, onAddText, onAddMusic, onMenu }: Props) {
   const [pps, setPps] = useState(36); // pixels per second
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const scroller = useRef<HTMLDivElement>(null);
@@ -40,10 +46,16 @@ export function Timeline({ doc, time, playing, selection, onSeek, onTogglePlay, 
   const width = Math.max(total * pps + 120, 600);
   const LABEL = 92;
 
-  const seekFromEvent = (e: React.MouseEvent) => {
+  const timeAt = (e: React.MouseEvent) => {
     const el = scroller.current!;
     const x = e.clientX - el.getBoundingClientRect().left + el.scrollLeft - LABEL;
-    onSeek(Math.max(0, Math.min(total, x / pps)));
+    return Math.max(0, Math.min(total, x / pps));
+  };
+  const seekFromEvent = (e: React.MouseEvent) => onSeek(timeAt(e));
+  const trackMenu = (track: "scenes" | "text" | "music") => (e: React.MouseEvent) => {
+    if (e.target !== e.currentTarget) return;
+    e.preventDefault();
+    onMenu(e, { kind: "track", track, time: timeAt(e) });
   };
 
   const resizeScene = (e: React.PointerEvent, i: number) => {
@@ -111,19 +123,21 @@ export function Timeline({ doc, time, playing, selection, onSeek, onTogglePlay, 
             </div>
           </div>
 
-          <Track label="Scenes" icon={Film} labelWidth={LABEL} onEmptyClick={seekFromEvent}>
+          <Track label="Scenes" icon={Film} labelWidth={LABEL} onEmptyClick={seekFromEvent} onEmptyMenu={trackMenu("scenes")}>
             {doc.scenes.map((sc, i) => (
               <SceneBlock key={sc.id} sc={sc} left={starts[i] * pps} width={sc.durationSec * pps} index={i}
                 selected={selection?.kind === "scene" && selection.id === sc.id}
                 onSelect={() => { onSelect({ kind: "scene", id: sc.id }); onSeek(starts[i] + 0.01); }}
                 onResize={(e) => resizeScene(e, i)}
-                onDragStart={() => setDragIndex(i)} onDrop={() => dropScene(i)} dragging={dragIndex === i} />
+                onDragStart={() => setDragIndex(i)} onDrop={() => dropScene(i)} dragging={dragIndex === i}
+                onMenu={(e) => { e.preventDefault(); onSelect({ kind: "scene", id: sc.id }); onMenu(e, { kind: "scene", id: sc.id }); }} />
             ))}
           </Track>
 
-          <Track label="Text" icon={Type} labelWidth={LABEL} onEmptyClick={seekFromEvent}>
+          <Track label="Text" icon={Type} labelWidth={LABEL} onEmptyClick={seekFromEvent} onEmptyMenu={trackMenu("text")}>
             {(doc.overlays ?? []).map((o) => (
-              <div key={o.id} onPointerDown={(e) => moveOverlay(e, o, "move")}
+              <div key={o.id} onPointerDown={(e) => { if (e.button === 0) moveOverlay(e, o, "move"); }}
+                onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onSelect({ kind: "overlay", id: o.id }); onMenu(e, { kind: "overlay", id: o.id }); }}
                 className={clsx("absolute top-1.5 bottom-1.5 flex cursor-grab items-center overflow-hidden rounded-md bg-amber-400/90 px-2 text-xs font-medium text-amber-950 active:cursor-grabbing",
                   selection?.kind === "overlay" && selection.id === o.id && "ring-2 ring-brand ring-offset-1")}
                 style={{ left: o.startSec * pps, width: Math.max(8, (o.endSec - o.startSec) * pps) }}>
@@ -134,9 +148,10 @@ export function Timeline({ doc, time, playing, selection, onSeek, onTogglePlay, 
             ))}
           </Track>
 
-          <Track label="Music" icon={Music} labelWidth={LABEL} onEmptyClick={seekFromEvent}>
+          <Track label="Music" icon={Music} labelWidth={LABEL} onEmptyClick={seekFromEvent} onEmptyMenu={trackMenu("music")}>
             {doc.music && (
               <button onClick={() => onSelect({ kind: "music" })}
+                onContextMenu={(e) => { e.preventDefault(); onSelect({ kind: "music" }); onMenu(e, { kind: "music" }); }}
                 className={clsx("absolute top-1.5 bottom-1.5 left-0 flex items-center gap-1.5 overflow-hidden rounded-md bg-emerald-500/90 px-2 text-xs font-medium text-white",
                   selection?.kind === "music" && "ring-2 ring-brand ring-offset-1")}
                 style={{ width: total * pps }}>
@@ -163,24 +178,25 @@ function ToolButton({ icon: Icon, label, onClick }: { icon: React.ElementType; l
   );
 }
 
-function Track({ label, icon: Icon, labelWidth, children, onEmptyClick }: { label: string; icon: React.ElementType; labelWidth: number; children: React.ReactNode; onEmptyClick: (e: React.MouseEvent) => void }) {
+function Track({ label, icon: Icon, labelWidth, children, onEmptyClick, onEmptyMenu }: { label: string; icon: React.ElementType; labelWidth: number; children: React.ReactNode; onEmptyClick: (e: React.MouseEvent) => void; onEmptyMenu: (e: React.MouseEvent) => void }) {
   return (
     <div className="flex h-14 border-b border-line">
       <div className="sticky left-0 z-10 flex shrink-0 items-center gap-1.5 border-r border-line bg-white px-3 text-xs font-medium text-muted" style={{ width: labelWidth }}>
         <Icon className="size-3.5" />{label}
       </div>
-      <div className="relative flex-1" onClick={(e) => { if (e.target === e.currentTarget) onEmptyClick(e); }}>{children}</div>
+      <div className="relative flex-1" onClick={(e) => { if (e.target === e.currentTarget) onEmptyClick(e); }} onContextMenu={onEmptyMenu}>{children}</div>
     </div>
   );
 }
 
-function SceneBlock({ sc, left, width, index, selected, onSelect, onResize, onDragStart, onDrop, dragging }: {
+function SceneBlock({ sc, left, width, index, selected, onSelect, onResize, onDragStart, onDrop, dragging, onMenu }: {
   sc: RenderScene; left: number; width: number; index: number; selected: boolean; dragging: boolean;
   onSelect: () => void; onResize: (e: React.PointerEvent) => void; onDragStart: () => void; onDrop: () => void;
+  onMenu: (e: React.MouseEvent) => void;
 }) {
   const media = sc.imageUrl;
   return (
-    <div draggable onDragStart={onDragStart} onDragOver={(e) => e.preventDefault()} onDrop={onDrop} onClick={onSelect}
+    <div draggable onDragStart={onDragStart} onDragOver={(e) => e.preventDefault()} onDrop={onDrop} onClick={onSelect} onContextMenu={onMenu}
       className={clsx("group absolute top-1.5 bottom-1.5 cursor-pointer overflow-hidden rounded-md text-white", TYPE_COLOR[sc.visual.type] ?? "bg-violet-500",
         selected && "ring-2 ring-brand ring-offset-1", dragging && "opacity-40")}
       style={{ left: left + 1, width: Math.max(10, width - 2) }} title={`${index + 1}. ${sc.visual.heading}`}>

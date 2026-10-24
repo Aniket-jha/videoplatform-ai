@@ -11,7 +11,7 @@ export default function Settings() {
     { icon: Mic, name: "ElevenLabs", role: "Studio voiceover (most realistic)", on: i.elevenlabs, env: "ELEVENLABS_API_KEY", fallback: i.neuralVoice ? "Kokoro neural voice, running locally (free)" : i.macSay ? "macOS system voice" : "Silent, timed by word count" },
     { icon: ImageIcon, name: "Pexels", role: "Stock photos and footage for image-based formats", on: i.pexels, env: "PEXELS_API_KEY (free)", fallback: "Openverse public-domain images" },
     { icon: UserRound, name: "HeyGen", role: "AI presenter for the Avatar format", on: i.heygen, env: "HEYGEN_API_KEY + HEYGEN_AVATAR_ID", fallback: "Animated presenter card" },
-    { icon: Film, name: "Google Veo", role: "AI footage for the Cinematic format", on: i.veo, env: "GEMINI_API_KEY", fallback: "Animated motion backgrounds" },
+    { icon: Film, name: "Google Gemini video", role: "AI footage for the Cinematic format (Gemini Omni Flash)", on: i.veo, env: "GEMINI_API_KEY", fallback: "Animated motion backgrounds" },
     { icon: CreditCard, name: "Stripe", role: "Subscriptions and checkout", on: i.stripe, env: "STRIPE_SECRET_KEY + price IDs", fallback: "Dev-mode plan switching" },
   ];
   return (
