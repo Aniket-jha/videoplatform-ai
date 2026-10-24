@@ -7,6 +7,7 @@ import { api, fmtMinutes, type LedgerRow, type PlanId } from "@/lib/api";
 import { useSession } from "@/components/session";
 import { Badge, Card, ErrorNote } from "@/components/ui";
 import { PricingGrid } from "@/components/pricing";
+import { FORMATS } from "@/lib/video-options";
 
 export default function BillingPage() {
   return <Suspense><Billing /></Suspense>;
@@ -66,9 +67,9 @@ function Billing() {
           <p className="text-xs text-muted">≈ {fmtMinutes(user.creditsSeconds)} of animated video</p>
         </Card>
         <Card className="p-5">
-          <p className="text-sm text-muted">Credit cost by style</p>
+          <p className="text-sm text-muted">Credits per second, by format</p>
           <div className="mt-2 flex flex-wrap gap-1.5">
-            {Object.entries(meta.styles).map(([k, s]) => <Badge key={k} tone={plan.styles.includes(k as never) ? "brand" : "neutral"}>{s.name.split(" ")[0]} {s.multiplier}×</Badge>)}
+            {FORMATS.map((f) => <Badge key={f.id} tone={plan.styles.includes(f.style) ? "brand" : "neutral"}>{f.label} {meta.styles[f.style].multiplier}×</Badge>)}
           </div>
         </Card>
       </div>

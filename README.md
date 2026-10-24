@@ -10,7 +10,8 @@ Next.js 15 + Tailwind 4 frontend for Reel Reports, a document-to-video platform.
   - **Direct Video** (`/app/direct`): upload a document, get a finished MP4 on the page.
   - **DIY Video** (`/app/diy`): upload a document; it pauses for script and storyboard review before anything renders.
   - **Chat** (`/app/chat`, `/app/chat/[id]`): talk it through with the assistant, then generate from the conversation. Conversations are listed under Chats history.
-  - Three video types on every page: Motion graphics, Cinematic, Avatar based. Settings: format, length, voice (with audio previews), captions, brand kit.
+  - Video type tabs: Educational, Corporate, Informational, Social Media (each applies sensible defaults; Social switches to vertical).
+  - Settings card: visual format (motion graphics, + images, visual video, cinematic AI, avatar), style preset (Clean, Bold, Editorial, Playful, Tech, Minimal), size, length, brand kit, voice with audio previews, captions. Direct and DIY also accept up to 8 of your own images.
 - **Project review** (`/app/projects/[id]`): pipeline progress, script editor, storyboard editor with scene previews, final player.
 - **My Media** (`/app/media`), **Brand Kits** (`/app/brand`), **Plan & Credits** (`/app/billing`), **Integrations** (`/app/settings`).
 

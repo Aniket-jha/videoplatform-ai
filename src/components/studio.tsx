@@ -4,25 +4,26 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import clsx from "clsx";
 import {
-  ArrowUp, BarChart3, CloudUpload, FileText, Lock, Paperclip, Pause, Play, ScrollText, SlidersHorizontal, Sparkles, UserRound, X, Clapperboard,
+  ArrowUp, BarChart3, CloudUpload, FileText, ImagePlus, Lock, Paperclip, Pause, Play, ScrollText, SlidersHorizontal, Sparkles, UserRound, X, Clapperboard,
 } from "lucide-react";
 import {
   api, CHATS_CHANGED, DEFAULT_SETTINGS, fmtSeconds,
-  type BrandKit, type ChatDetail, type ChatMessage, type ChatMode, type ChatProject, type ChatSettings, type ProjectSummary, type Style,
+  type BrandKit, type Category, type ChatDetail, type ChatMessage, type ChatMode, type ChatProject, type ChatSettings, type ProjectSummary, type Style,
 } from "@/lib/api";
 import { useSession } from "./session";
 import { Button, ErrorNote, Label, Select } from "./ui";
 import { ProjectCard } from "./project-card";
+import { CATEGORIES, FORMATS, PRESETS, categoryLabel, formatLabel, formatOf } from "@/lib/video-options";
 import { isWorking } from "./status";
 
 // The three video types the product offers.
-type VideoType = "motion" | "cinematic" | "avatar";
-const TABS: { id: VideoType; label: string; icon: React.ElementType }[] = [
-  { id: "motion", label: "Motion Graphics Video", icon: BarChart3 },
-  { id: "cinematic", label: "Cinematic Video", icon: Clapperboard },
-  { id: "avatar", label: "Avatar Based Video", icon: UserRound },
-];
-const toVideoType = (s: Style): VideoType => (s === "cinematic" || s === "avatar" ? s : "motion");
+// Retired styles (hybrid, voice-over) open as motion graphics with images.
+const normalize = (st: Partial<ChatSettings>): ChatSettings => {
+  const merged = { ...DEFAULT_SETTINGS, ...st };
+  if (merged.style === "hybrid" || merged.style === "voiceover") return { ...merged, style: "motion", look: "images" };
+  return merged;
+};
+const MAX_IMAGES = 8;
 
 // Each mode is its own page in the sidebar: Direct Video, DIY Video, Chat.
 const MODES: Record<ChatMode, { headline: string; text: string; placeholder: string }> = {
@@ -54,8 +55,10 @@ const readStore = <T,>(store: "local" | "session", key: string, fallback: T): T 
 const writeStore = (store: "local" | "session", key: string, value: unknown) => {
   try { (store === "local" ? localStorage : sessionStorage).setItem(key, JSON.stringify(value)); } catch { /* storage unavailable */ }
 };
+// File names become readable titles: "expense-policy_2027.md" → "Expense Policy 2027".
+const titleCase = (t: string) => t.replace(/\b([a-z])/g, (m) => m.toUpperCase());
 const titleFrom = (text: string, file: File | null) =>
-  (file && (!text || text.length > 80) ? file.name.replace(/\.[^.]+$/, "").replace(/[-_]+/g, " ") : text.split(/\s+/).slice(0, 8).join(" "))
+  (file && (!text || text.length > 80) ? titleCase(file.name.replace(/\.[^.]+$/, "").replace(/[-_]+/g, " ")) : text.split(/\s+/).slice(0, 8).join(" "))
     .slice(0, 80).replace(/[\s,.;:!?-]+$/, "") || "New video";
 
 /**
@@ -74,6 +77,8 @@ export function Studio({ mode, chatId }: { mode: ChatMode; chatId?: string }) {
   const [kits, setKits] = useState<BrandKit[]>([]);
   const [text, setText] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  const [images, setImages] = useState<File[]>([]);
+  const imagesRef = useRef<HTMLInputElement>(null);
   const [pending, setPending] = useState<Pending>(null);
   const [error, setError] = useState("");
   const [showSettings, setShowSettings] = useState(false);
@@ -89,7 +94,7 @@ export function Studio({ mode, chatId }: { mode: ChatMode; chatId?: string }) {
   useEffect(() => {
     if (chatId) return;
     const saved = readStore<Partial<ChatSettings>>("local", SETTINGS_KEY, {});
-    setSettings({ ...DEFAULT_SETTINGS, ...saved, style: toVideoType((saved.style ?? "motion") as Style) });
+    setSettings(normalize(saved));
     if (mode !== "chat") setRuns(readStore<string[]>("session", runsKey(mode), []));
   }, [chatId, mode]);
 
@@ -113,7 +118,7 @@ export function Studio({ mode, chatId }: { mode: ChatMode; chatId?: string }) {
     if (!chatId) return;
     load().then((d) => {
       // Older chats may hold retired styles (hybrid, voice-over); show them as motion graphics.
-      if (d) setSettings({ ...d.chat.settings, style: toVideoType(d.chat.settings.style) });
+      if (d) setSettings(normalize(d.chat.settings));
     }).catch(() => setError("Couldn't load this chat."));
   }, [chatId]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -140,7 +145,11 @@ export function Studio({ mode, chatId }: { mode: ChatMode; chatId?: string }) {
     persist({ settings: next });
   };
 
-  const allowed = (s: Style) => plan.styles.includes(s);
+  /** Picking a video type also applies that type's sensible defaults (style, format, length). */
+  const changeCategory = (category: Category) => {
+    const d = CATEGORIES.find((c) => c.id === category)!.defaults;
+    changeSettings({ ...d, category, targetSeconds: Math.min(d.targetSeconds ?? settings.targetSeconds, plan.maxVideoSeconds) });
+  };
   const credits = Math.ceil(settings.targetSeconds * meta.styles[settings.style].multiplier);
 
   async function send() {
@@ -185,11 +194,13 @@ export function Studio({ mode, chatId }: { mode: ChatMode; chatId?: string }) {
     const fields: Record<string, string> = {
       title: titleFrom(body, file), mode: mode === "direct" ? "direct" : "guided", style: settings.style, theme: settings.theme,
       aspect: settings.aspect, voice: settings.voice, targetSeconds: String(settings.targetSeconds), captions: String(settings.captions),
+      category: settings.category, look: settings.look, preset: settings.preset,
     };
     if (settings.brandKitId) fields.brandKitId = settings.brandKitId;
     Object.entries(fields).forEach(([k, v]) => fd.append(k, v));
     if (body) fd.append("text", body);
     if (file) fd.append("file", file);
+    images.forEach((img) => fd.append("images", img));
     try {
       const { project } = await api<{ project: ProjectSummary }>("/projects", { method: "POST", body: fd });
       const next = [project.id, ...runs];
@@ -198,6 +209,7 @@ export function Studio({ mode, chatId }: { mode: ChatMode; chatId?: string }) {
       setProjects((p) => ({ ...p, [project.id]: project as ChatProject }));
       setText("");
       setFile(null);
+      setImages([]);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -230,25 +242,20 @@ export function Studio({ mode, chatId }: { mode: ChatMode; chatId?: string }) {
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Style tabs, as in the mockup */}
+      {/* Video type tabs (as in the mockup) */}
       <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center sm:gap-1">
-        {TABS.map((t) => {
-          const on = toVideoType(settings.style) === t.id;
-          const locked = !allowed(t.id);
+        {CATEGORIES.map((c) => {
+          const on = settings.category === c.id;
           return (
-            <button key={t.id} disabled={locked} onClick={() => changeSettings({ style: t.id })}
-              title={locked ? `Needs the ${meta.plans[meta.styles[t.id].minPlan].name} plan` : meta.styles[t.id].tagline}
+            <button key={c.id} onClick={() => changeCategory(c.id)} title={c.text}
               className={clsx(
-                "flex items-center justify-center gap-1.5 rounded-xl px-5 py-3 text-sm font-semibold transition sm:min-w-44",
+                "flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold transition sm:min-w-40",
                 on ? "bg-brand text-white shadow-lg shadow-indigo-900/20" : "text-brand hover:bg-white/70",
-                locked && "cursor-not-allowed opacity-50",
               )}>
-              {locked ? <Lock className="size-4" /> : <t.icon className="size-4" />}{t.label}
-              {locked && <span className="rounded-full bg-brand/10 px-1.5 py-0.5 text-[10px]">{meta.plans[meta.styles[t.id].minPlan].name}</span>}
+              <c.icon className="size-4" />{c.label} Video
             </button>
           );
         })}
-
       </div>
 
       {generateView ? (
@@ -281,13 +288,38 @@ export function Studio({ mode, chatId }: { mode: ChatMode; chatId?: string }) {
                   <p className="mt-1 text-sm text-muted">or <span className="font-medium text-brand">click to browse</span> · PDF, DOCX, Markdown, TXT or CSV up to 25 MB</p>
                 </button>
               )}
+              {settings.look !== "text" && settings.style !== "avatar" && (
+                <div className="mt-5 rounded-2xl border border-line bg-surface-2/60 p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <p className="text-sm font-semibold">Your images <span className="font-normal text-muted">(optional)</span></p>
+                      <p className="text-xs text-muted">Used first in the scenes; stock photos fill the rest. Up to {MAX_IMAGES}.</p>
+                    </div>
+                    <Button size="sm" variant="secondary" onClick={() => imagesRef.current?.click()} disabled={images.length >= MAX_IMAGES}><ImagePlus className="size-4" /> Add images</Button>
+                  </div>
+                  {images.length > 0 && (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {images.map((img, i) => (
+                        <div key={i} className="group relative size-20 overflow-hidden rounded-xl border border-line bg-white">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={URL.createObjectURL(img)} alt={img.name} className="size-full object-cover" />
+                          <button onClick={() => setImages(images.filter((_, k) => k !== i))} aria-label={`Remove ${img.name}`}
+                            className="absolute right-1 top-1 grid size-5 place-items-center rounded-full bg-black/60 text-white opacity-0 transition group-hover:opacity-100"><X className="size-3" /></button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <input ref={imagesRef} type="file" hidden multiple accept=".png,.jpg,.jpeg,.webp"
+                    onChange={(e) => { const add = Array.from(e.target.files ?? []); setImages((cur) => [...cur, ...add].slice(0, MAX_IMAGES)); e.target.value = ""; }} />
+                </div>
+              )}
               {error && <div className="mt-4"><ErrorNote>{error}</ErrorNote></div>}
               <div className="mt-6 flex flex-wrap items-center gap-4">
                 <Button size="lg" loading={generating} disabled={!file} onClick={() => startVideo("")}>
                   {mode === "direct" ? <><Clapperboard className="size-5" /> Generate video</> : <><ScrollText className="size-5" /> Write my script</>}
                 </Button>
                 <p className="text-sm text-muted">
-                  {meta.styles[settings.style].name} · {settings.aspect} · ≈ {fmtSeconds(settings.targetSeconds)} · ≈ {credits.toLocaleString()} credits
+                  {categoryLabel(settings.category)} · {formatLabel(settings.style, settings.look)} · {settings.aspect} · ≈ {fmtSeconds(settings.targetSeconds)} · ≈ {credits.toLocaleString()} credits
                   {mode === "script" && " · charged only after you approve"}
                 </p>
               </div>
@@ -418,7 +450,7 @@ type SettingsProps = { settings: ChatSettings; kits: BrandKit[]; onChange: (p: P
 
 function SettingsPanel({ onClose, ...props }: SettingsProps & { onClose: () => void }) {
   return (
-    <div className="shadow-card absolute bottom-full right-0 z-20 mb-2 w-[min(92vw,380px)] rounded-2xl border border-line bg-white p-5">
+    <div className="shadow-card absolute bottom-full right-0 z-20 mb-2 max-h-[70vh] w-[min(92vw,380px)] overflow-y-auto rounded-2xl border border-line bg-white p-5">
       <div className="mb-4 flex items-center justify-between">
         <p className="font-semibold">Video settings</p>
         <button onClick={onClose} className="rounded-lg p-1 text-muted hover:bg-surface-2" aria-label="Close settings"><X className="size-4" /></button>
@@ -428,11 +460,69 @@ function SettingsPanel({ onClose, ...props }: SettingsProps & { onClose: () => v
   );
 }
 
+let presetFontsLoaded = false;
+/** Loads the style presets' Google Fonts once, so the tiles preview the real typefaces. */
+function usePresetFonts() {
+  useEffect(() => {
+    if (presetFontsLoaded) return;
+    presetFontsLoaded = true;
+    const link = document.createElement("link");
+    link.rel = "stylesheet";
+    link.href = `https://fonts.googleapis.com/css2?${[...new Set(PRESETS.map((p) => p.font))].map((f) => `family=${encodeURIComponent(f)}:wght@800`).join("&")}&display=swap`;
+    document.head.appendChild(link);
+  }, []);
+}
+
 function SettingsFields({ settings, kits, onChange, maxSeconds }: SettingsProps) {
+  usePresetFonts();
+  const { user, meta } = useSession();
+  const plan = meta.plans[user.plan];
+  const format = formatOf(settings);
   return (
-      <div className="space-y-4">
+      <div className="space-y-5">
         <div>
-          <Label>Format</Label>
+          <Label>Visual format</Label>
+          <div className="grid gap-1.5">
+            {FORMATS.map((f) => {
+              const locked = !plan.styles.includes(f.style);
+              const on = format === f.id;
+              return (
+                <button key={f.id} disabled={locked} onClick={() => onChange({ style: f.style, look: f.look })}
+                  title={locked ? `Needs the ${meta.plans[meta.styles[f.style].minPlan].name} plan` : undefined}
+                  className={clsx("flex items-center gap-3 rounded-xl border px-3 py-2 text-left transition disabled:cursor-not-allowed disabled:opacity-50",
+                    on ? "border-brand bg-indigo-50" : "border-line hover:border-line-strong hover:bg-surface-2")}>
+                  <span className={clsx("grid size-8 shrink-0 place-items-center rounded-lg", on ? "bg-brand text-white" : "bg-surface-2 text-brand")}>
+                    {locked ? <Lock className="size-4" /> : <f.icon className="size-4" />}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className={clsx("block text-sm font-medium", on && "text-brand")}>{f.label}</span>
+                    <span className="block truncate text-xs text-muted">{locked ? `${meta.plans[meta.styles[f.style].minPlan].name} plan` : f.text}</span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+        <div>
+          <Label hint={kits.length ? "Brand kit colours override" : undefined}>Style</Label>
+          <div className="grid grid-cols-3 gap-2">
+            {PRESETS.map((p) => (
+              <button key={p.id} onClick={() => onChange({ preset: p.id })} aria-pressed={settings.preset === p.id}
+                className={clsx("overflow-hidden rounded-xl border text-left transition", settings.preset === p.id ? "border-brand ring-2 ring-brand/20" : "border-line hover:border-line-strong")}>
+                <div className="flex h-12 flex-col justify-center gap-1 px-2" style={{ background: p.bg }}>
+                  <span className="truncate text-[11px] font-extrabold leading-none" style={{ color: p.text, fontFamily: `'${p.font}', sans-serif` }}>Aa Title</span>
+                  <span className="flex gap-1">
+                    <span className="h-1.5 w-6" style={{ background: p.accent, borderRadius: p.radius }} />
+                    <span className="h-1.5 w-3" style={{ background: p.accent2, borderRadius: p.radius }} />
+                  </span>
+                </div>
+                <span className={clsx("block px-2 py-1 text-xs font-medium", settings.preset === p.id && "text-brand")}>{p.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+        <div>
+          <Label>Size</Label>
           <div className="grid grid-cols-3 gap-2">
             {(["16:9", "9:16", "1:1"] as const).map((a) => (
               <button key={a} onClick={() => onChange({ aspect: a })} className={clsx("rounded-xl border py-2 text-xs font-medium",

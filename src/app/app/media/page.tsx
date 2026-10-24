@@ -3,19 +3,20 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import clsx from "clsx";
 import { Clapperboard, FileText, Film, Plus, Sparkles } from "lucide-react";
-import { api, fmtSeconds, type ProjectSummary, type Style } from "@/lib/api";
+import { api, fmtSeconds, type Category, type ProjectSummary } from "@/lib/api";
+import { CATEGORIES, categoryLabel, formatLabel } from "@/lib/video-options";
 import { useSession } from "@/components/session";
 import { Button, Card, PageTitle } from "@/components/ui";
 import { StatusBadge, isWorking } from "@/components/status";
 
-const FILTERS: { id: "all" | Style; label: string }[] = [
-  { id: "all", label: "All" }, { id: "motion", label: "Motion graphics" }, { id: "cinematic", label: "Cinematic" }, { id: "avatar", label: "Avatar" },
+const FILTERS: { id: "all" | Category; label: string }[] = [
+  { id: "all", label: "All" }, ...CATEGORIES.map((c) => ({ id: c.id, label: c.label })),
 ];
 
 export default function Media() {
   const { user, meta } = useSession();
   const [projects, setProjects] = useState<ProjectSummary[] | null>(null);
-  const [filter, setFilter] = useState<"all" | Style>("all");
+  const [filter, setFilter] = useState<"all" | Category>("all");
 
   useEffect(() => {
     let t: ReturnType<typeof setTimeout>;
@@ -30,8 +31,7 @@ export default function Media() {
 
   const done = projects?.filter((p) => p.status === "done") ?? [];
   const totalSec = done.reduce((s, p) => s + (p.durationSec ?? 0), 0);
-  const typeOf = (s: Style) => (s === "cinematic" || s === "avatar" ? s : "motion");
-  const shown = projects?.filter((p) => filter === "all" || typeOf(p.style) === filter) ?? [];
+  const shown = projects?.filter((p) => filter === "all" || (p.category ?? "informational") === filter) ?? [];
 
   return (
     <div className="space-y-6">
@@ -102,7 +102,7 @@ function ProjectTile({ p }: { p: ProjectSummary }) {
         </div>
         <div className="p-4">
           <h3 className="truncate font-semibold">{p.title}</h3>
-          <p className="mt-1 truncate text-xs text-muted">{p.docName} · {p.style} · {p.aspect} · {new Date(p.createdAt).toLocaleDateString()}</p>
+          <p className="mt-1 truncate text-xs text-muted">{categoryLabel(p.category)} · {formatLabel(p.style, p.look)} · {p.aspect} · {new Date(p.createdAt).toLocaleDateString()}</p>
         </div>
       </Card>
     </Link>

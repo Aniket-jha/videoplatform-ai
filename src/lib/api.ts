@@ -1,6 +1,9 @@
 export type User = { id: string; email: string; name: string; plan: PlanId; creditsSeconds: number };
 export type PlanId = "free" | "basic" | "pro" | "cinematic";
 export type Style = "motion" | "avatar" | "hybrid" | "cinematic" | "voiceover";
+export type Category = "educational" | "corporate" | "informational" | "social";
+/** text = motion graphics only; images = motion graphics with photos; visual = full-screen photos/footage. */
+export type Look = "text" | "images" | "visual";
 
 export type Plan = {
   name: string; priceMonthly: number; monthlySeconds: number; styles: Style[];
@@ -12,7 +15,7 @@ export type Meta = {
   voices: Record<string, string>;
   themes: string[];
   fonts: string[];
-  integrations: Record<"claude" | "elevenlabs" | "macSay" | "neuralVoice" | "heygen" | "veo" | "stripe", boolean>;
+  integrations: Record<"claude" | "elevenlabs" | "macSay" | "neuralVoice" | "pexels" | "heygen" | "veo" | "stripe", boolean>;
 };
 
 export type Script = { title: string; summary: string; sections: { heading: string; narration: string }[] };
@@ -38,6 +41,7 @@ export type ProjectSummary = {
   targetSeconds: number; captions: boolean; status: Status; progress: number; docName: string | null;
   durationSec: number | null; creditsCharged: number; error: string | null; createdAt: string; updatedAt: string;
   hasVideo: boolean; hasThumb: boolean;
+  category?: Category; look?: Look; preset?: string | null;
 };
 export type ProjectDetail = ProjectSummary & {
   script: Script | null; storyboard: Storyboard | null; docPreview: string | null;
@@ -75,16 +79,18 @@ export type ChatMode = "direct" | "script" | "chat";
 export type ChatSettings = {
   style: Style; aspect: "16:9" | "9:16" | "1:1"; voice: string; targetSeconds: number;
   captions: boolean; brandKitId: string | null; theme: string;
+  category: Category; look: Look; preset: string;
 };
 export const DEFAULT_SETTINGS: ChatSettings = {
   style: "motion", aspect: "16:9", voice: "ava", targetSeconds: 60, captions: true, brandKitId: null, theme: "midnight",
+  category: "informational", look: "images", preset: "tech",
 };
 export type ChatSummary = { id: string; title: string; mode: ChatMode; updatedAt: string };
 export type ChatMessage = {
   id: string; role: "user" | "assistant"; kind: "text" | "project" | "error"; content: string;
   attachmentName: string | null; projectId: string | null; createdAt: string;
 };
-export type ChatProject = Pick<ProjectSummary, "id" | "title" | "status" | "progress" | "style" | "aspect" | "mode" | "durationSec" | "error" | "updatedAt" | "hasVideo" | "hasThumb">;
+export type ChatProject = Pick<ProjectSummary, "id" | "title" | "status" | "progress" | "style" | "aspect" | "mode" | "durationSec" | "error" | "updatedAt" | "hasVideo" | "hasThumb" | "category" | "look">;
 export type ChatDetail = { id: string; title: string; mode: ChatMode; settings: ChatSettings };
 
 export type BrandKit = {

@@ -1,4 +1,4 @@
-import { ArrowRight, BarChart3, Clapperboard, FileText, Film, Mic, PenLine, Sparkles, UserRound, Wand2, Eye, Zap, ShieldCheck, MessagesSquare, Palette } from "lucide-react";
+import { ArrowRight, BarChart3, Briefcase, GraduationCap, ImageIcon, Info, Smartphone, Clapperboard, FileText, Film, Mic, PenLine, Sparkles, UserRound, Wand2, Eye, Zap, ShieldCheck, MessagesSquare, Palette } from "lucide-react";
 import { Button, Card, Logo } from "@/components/ui";
 import { PricingGrid } from "@/components/pricing";
 
@@ -12,9 +12,18 @@ const steps = [
 ];
 
 const styles = [
-  { icon: BarChart3, name: "Motion graphics", text: "Animated charts, kinetic text and icons, rendered from your real numbers. Perfect for reports and data.", price: "1× credits", tag: "Free" },
-  { icon: Clapperboard, name: "Cinematic", text: "Fully AI-generated footage scene by scene, for marketing that turns heads.", price: "10× credits", tag: "Cinematic" },
-  { icon: UserRound, name: "Avatar based", text: "A lifelike AI presenter speaks your script. Ideal for training and corporate updates.", price: "3× credits", tag: "Pro" },
+  { icon: BarChart3, name: "Motion graphics", text: "Animated charts, kinetic text and icons, rendered from your real numbers.", price: "1× credits", tag: "Free" },
+  { icon: ImageIcon, name: "Motion graphics + images", text: "Your content animated beside relevant photos, yours or stock.", price: "1× credits", tag: "Free" },
+  { icon: Film, name: "Visual video", text: "Full-screen photos and stock footage with narration and bold captions.", price: "1× credits", tag: "Free" },
+  { icon: Clapperboard, name: "Cinematic AI", text: "Fully AI-generated footage scene by scene, for marketing that turns heads.", price: "10× credits", tag: "Cinematic" },
+  { icon: UserRound, name: "Avatar presenter", text: "A lifelike AI presenter speaks your script. Ideal for training and updates.", price: "3× credits", tag: "Pro" },
+];
+
+const videoTypes = [
+  { icon: GraduationCap, name: "Educational", text: "Step-by-step lessons with examples and a recap." },
+  { icon: Briefcase, name: "Corporate", text: "Polished updates: results, what they mean, next steps." },
+  { icon: Info, name: "Informational", text: "Clear, neutral explainers built on your facts." },
+  { icon: Smartphone, name: "Social media", text: "Vertical shorts with a hook and word-by-word captions." },
 ];
 
 const faqs = [
@@ -93,8 +102,17 @@ export default function Landing() {
       </section>
 
       <section id="styles" className="relative z-10 mx-auto max-w-6xl px-4 py-24 sm:px-6">
-        <SectionHead eyebrow="Video styles" title="Three kinds of video" text="Motion graphics for data, cinematic footage for marketing, and avatar presenters for training. All narrated with natural, human-sounding voices." />
-        <div className="mt-14 grid gap-4 md:grid-cols-3">
+        <SectionHead eyebrow="Video types & formats" title="Any kind of video, any look" text="Pick what the video is for, how it should look, and one of six styles: Clean, Bold, Editorial, Playful, Tech or Minimal. Every video is narrated with natural, human-sounding voices." />
+        <div className="mt-14 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {videoTypes.map((t) => (
+            <Card key={t.name} className="p-5">
+              <t.icon className="size-5 text-brand" />
+              <h3 className="mt-3 font-semibold">{t.name}</h3>
+              <p className="mt-1 text-sm text-muted">{t.text}</p>
+            </Card>
+          ))}
+        </div>
+        <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
           {styles.map((s) => (
             <Card key={s.name} className="group p-6 transition hover:border-brand/40">
               <div className="flex items-start justify-between">

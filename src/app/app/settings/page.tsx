@@ -1,5 +1,5 @@
 "use client";
-import { BrainCircuit, CreditCard, Film, Mic, UserRound } from "lucide-react";
+import { BrainCircuit, CreditCard, Film, ImageIcon, Mic, UserRound } from "lucide-react";
 import { useSession } from "@/components/session";
 import { Badge, Card } from "@/components/ui";
 
@@ -9,8 +9,9 @@ export default function Settings() {
   const rows = [
     { icon: BrainCircuit, name: "Claude", role: "Reads documents, writes scripts and storyboards", on: i.claude, env: "ANTHROPIC_API_KEY", fallback: "Offline heuristic writer" },
     { icon: Mic, name: "ElevenLabs", role: "Studio voiceover (most realistic)", on: i.elevenlabs, env: "ELEVENLABS_API_KEY", fallback: i.neuralVoice ? "Kokoro neural voice, running locally (free)" : i.macSay ? "macOS system voice" : "Silent, timed by word count" },
-    { icon: UserRound, name: "HeyGen", role: "AI presenter for Avatar and Hybrid styles", on: i.heygen, env: "HEYGEN_API_KEY + HEYGEN_AVATAR_ID", fallback: "Animated presenter card" },
-    { icon: Film, name: "Google Veo", role: "Cinematic B-roll for Hybrid and Cinematic styles", on: i.veo, env: "GEMINI_API_KEY", fallback: "Animated motion backgrounds" },
+    { icon: ImageIcon, name: "Pexels", role: "Stock photos and footage for image-based formats", on: i.pexels, env: "PEXELS_API_KEY (free)", fallback: "Openverse public-domain images" },
+    { icon: UserRound, name: "HeyGen", role: "AI presenter for the Avatar format", on: i.heygen, env: "HEYGEN_API_KEY + HEYGEN_AVATAR_ID", fallback: "Animated presenter card" },
+    { icon: Film, name: "Google Veo", role: "AI footage for the Cinematic format", on: i.veo, env: "GEMINI_API_KEY", fallback: "Animated motion backgrounds" },
     { icon: CreditCard, name: "Stripe", role: "Subscriptions and checkout", on: i.stripe, env: "STRIPE_SECRET_KEY + price IDs", fallback: "Dev-mode plan switching" },
   ];
   return (

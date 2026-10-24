@@ -5,6 +5,7 @@ import { AlertTriangle, ArrowRight, Check, Download, Film, RefreshCw } from "luc
 import { api, fmtSeconds, type ChatProject } from "@/lib/api";
 import { Button } from "./ui";
 import { PIPELINE, StatusBadge, isWorking, stepOf } from "./status";
+import { categoryLabel, formatLabel } from "@/lib/video-options";
 
 /** A video project rendered inline in a chat thread; the thread polls for updates. */
 export function ProjectCard({ p, onChanged }: { p: ChatProject; onChanged: () => void }) {
@@ -16,7 +17,7 @@ export function ProjectCard({ p, onChanged }: { p: ChatProject; onChanged: () =>
         <div className="bg-brand-gradient grid size-9 shrink-0 place-items-center rounded-xl"><Film className="size-4 text-white" /></div>
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold">{p.title}</p>
-          <p className="text-xs text-muted">{p.mode === "direct" ? "Direct video" : "DIY video"} · {p.style} · {p.aspect}</p>
+          <p className="text-xs text-muted">{p.mode === "direct" ? "Direct" : "DIY"} · {categoryLabel(p.category)} · {formatLabel(p.style, p.look)} · {p.aspect}</p>
         </div>
         <StatusBadge status={p.status} />
       </div>
