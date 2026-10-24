@@ -27,12 +27,12 @@ const toVideoType = (s: Style): VideoType => (s === "cinematic" || s === "avatar
 // Each mode is its own page in the sidebar: Direct Video, DIY Video, Chat.
 const MODES: Record<ChatMode, { headline: string; text: string; placeholder: string }> = {
   direct: {
-    headline: "Describe your video or upload a document",
+    headline: "Upload a document to generate a video",
     text: "We'll write, voice and render the whole video for you, start to finish.",
     placeholder: "Describe the video, paste text, or attach a document…",
   },
   script: {
-    headline: "Build your video step by step",
+    headline: "Upload a document to build your video step by step",
     text: "We'll write the script first. You edit the script and every scene before anything renders.",
     placeholder: "What should the video cover? Attach a document to start from it…",
   },
@@ -179,6 +179,7 @@ export function Studio({ mode, chatId }: { mode: ChatMode; chatId?: string }) {
   /** Direct / DIY Video: create the project straight away, no conversation. */
   async function startVideo(body: string) {
     setError("");
+    if (!file) { setError("Choose a document to upload."); return; }
     setGenerating(true);
     const fd = new FormData();
     const fields: Record<string, string> = {
@@ -220,7 +221,7 @@ export function Studio({ mode, chatId }: { mode: ChatMode; chatId?: string }) {
   }
 
   const generateView = !chatId && mode !== "chat";
-  const empty = !chatId && !pending && !(generateView && runs.length);
+  const empty = !chatId && !pending;
 
   const current = MODES[mode];
   // Offer "Generate video" after a chat reply, until a video is started from it.
@@ -250,6 +251,66 @@ export function Studio({ mode, chatId }: { mode: ChatMode; chatId?: string }) {
 
       </div>
 
+      {generateView ? (
+        <div className="grid gap-5 xl:grid-cols-[1fr_380px]">
+          <div className="min-w-0 space-y-5">
+            <div className="shadow-card rounded-2xl bg-white p-5 sm:p-8">
+              <h2 className="text-xl font-semibold sm:text-2xl">{current.headline}</h2>
+              <p className="mt-1 text-sm text-muted">{current.text}</p>
+              {file ? (
+                <div className="mt-6 flex flex-wrap items-center gap-4 rounded-2xl border border-indigo-200 bg-indigo-50/60 p-5">
+                  <div className="bg-brand-gradient grid size-12 shrink-0 place-items-center rounded-xl"><FileText className="size-6 text-white" /></div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-semibold">{file.name}</p>
+                    <p className="text-sm text-muted">{file.size < 1024 ? "Under 1 KB" : `${Math.round(file.size / 1024).toLocaleString()} KB`} · ready to {mode === "direct" ? "generate" : "script"}</p>
+                  </div>
+                  <Button size="sm" variant="secondary" onClick={() => fileRef.current?.click()}>Replace</Button>
+                  <Button size="sm" variant="ghost" onClick={() => setFile(null)} aria-label="Remove document"><X className="size-4" /></Button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => fileRef.current?.click()}
+                  onDragOver={(e) => { e.preventDefault(); setDrag(true); }}
+                  onDragLeave={() => setDrag(false)}
+                  onDrop={(e) => { e.preventDefault(); setDrag(false); const f = e.dataTransfer.files[0]; if (f) setFile(f); }}
+                  className={clsx("group mt-6 flex w-full flex-col items-center rounded-2xl border-2 border-dashed px-6 py-14 text-center transition",
+                    drag ? "border-brand bg-indigo-50" : "border-line-strong hover:border-brand/40 hover:bg-surface-2")}
+                >
+                  <CloudUpload className="size-20 text-[#6b6b6b] transition group-hover:scale-105 group-hover:text-brand" strokeWidth={1.5} />
+                  <p className="mt-3 text-lg font-semibold text-fg">Drop your document here</p>
+                  <p className="mt-1 text-sm text-muted">or <span className="font-medium text-brand">click to browse</span> · PDF, DOCX, Markdown, TXT or CSV up to 25 MB</p>
+                </button>
+              )}
+              {error && <div className="mt-4"><ErrorNote>{error}</ErrorNote></div>}
+              <div className="mt-6 flex flex-wrap items-center gap-4">
+                <Button size="lg" loading={generating} disabled={!file} onClick={() => startVideo("")}>
+                  {mode === "direct" ? <><Clapperboard className="size-5" /> Generate video</> : <><ScrollText className="size-5" /> Write my script</>}
+                </Button>
+                <p className="text-sm text-muted">
+                  {meta.styles[settings.style].name} · {settings.aspect} · ≈ {fmtSeconds(settings.targetSeconds)} · ≈ {credits.toLocaleString()} credits
+                  {mode === "script" && " · charged only after you approve"}
+                </p>
+              </div>
+            </div>
+
+            {runs.length > 0 && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between px-1">
+                  <h3 className="text-sm font-semibold uppercase tracking-wider text-muted">Your videos</h3>
+                  <Link href="/app/media" className="text-sm font-medium text-brand hover:underline">See all in My Media</Link>
+                </div>
+                {runs.map((id) => projects[id] && <ProjectCard key={id} p={projects[id]} onChanged={load} />)}
+              </div>
+            )}
+          </div>
+
+          <div className="shadow-card h-fit rounded-2xl bg-white p-5 xl:sticky xl:top-6">
+            <p className="mb-4 font-semibold">Video settings</p>
+            <SettingsFields settings={settings} kits={kits} onChange={changeSettings} maxSeconds={plan.maxVideoSeconds} />
+          </div>
+          <input ref={fileRef} type="file" hidden accept=".pdf,.docx,.txt,.md,.csv" onChange={(e) => { setFile(e.target.files?.[0] ?? null); e.target.value = ""; }} />
+        </div>
+      ) : (
       <div
         className={clsx("shadow-card relative flex min-h-[calc(100vh-15rem)] flex-col rounded-2xl bg-white transition", drag && "ring-4 ring-brand/20")}
         onDragOver={(e) => { e.preventDefault(); setDrag(true); }}
@@ -269,14 +330,6 @@ export function Studio({ mode, chatId }: { mode: ChatMode; chatId?: string }) {
               <p className="mt-2 max-w-xl text-sm text-muted">{current.text}</p>
               <Button variant="secondary" className="mt-6" onClick={() => fileRef.current?.click()}><Paperclip className="size-4" /> Upload a document</Button>
               <p className="mt-2 text-xs text-muted">PDF, DOCX, Markdown, TXT or CSV · or just type below</p>
-            </div>
-          ) : generateView ? (
-            <div className="mx-auto max-w-3xl space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold uppercase tracking-wider text-muted">Your videos</h3>
-                <Link href="/app/media" className="text-sm font-medium text-brand hover:underline">See all in My Media</Link>
-              </div>
-              {runs.map((id) => projects[id] && <ProjectCard key={id} p={projects[id]} onChanged={load} />)}
             </div>
           ) : (
             <div className="mx-auto max-w-3xl space-y-5">
@@ -353,6 +406,7 @@ export function Studio({ mode, chatId }: { mode: ChatMode; chatId?: string }) {
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 }
@@ -360,16 +414,22 @@ export function Studio({ mode, chatId }: { mode: ChatMode; chatId?: string }) {
 const kitLabel = (id: string | null, kits: BrandKit[]) =>
   id === "none" ? "No brand kit" : (kits.find((k) => k.id === id) ?? kits.find((k) => k.isDefault))?.name ?? "No brand kit";
 
-function SettingsPanel({ settings, kits, onChange, onClose, maxSeconds }: {
-  settings: ChatSettings; kits: BrandKit[]; onChange: (p: Partial<ChatSettings>) => void; onClose: () => void; maxSeconds: number;
-}) {
-  const { meta } = useSession();
+type SettingsProps = { settings: ChatSettings; kits: BrandKit[]; onChange: (p: Partial<ChatSettings>) => void; maxSeconds: number };
+
+function SettingsPanel({ onClose, ...props }: SettingsProps & { onClose: () => void }) {
   return (
     <div className="shadow-card absolute bottom-full right-0 z-20 mb-2 w-[min(92vw,380px)] rounded-2xl border border-line bg-white p-5">
       <div className="mb-4 flex items-center justify-between">
         <p className="font-semibold">Video settings</p>
         <button onClick={onClose} className="rounded-lg p-1 text-muted hover:bg-surface-2" aria-label="Close settings"><X className="size-4" /></button>
       </div>
+      <SettingsFields {...props} />
+    </div>
+  );
+}
+
+function SettingsFields({ settings, kits, onChange, maxSeconds }: SettingsProps) {
+  return (
       <div className="space-y-4">
         <div>
           <Label>Format</Label>
@@ -401,7 +461,6 @@ function SettingsPanel({ settings, kits, onChange, onClose, maxSeconds }: {
           Burn in captions
         </label>
       </div>
-    </div>
   );
 }
 

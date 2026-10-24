@@ -7,8 +7,8 @@ Next.js 15 + Tailwind 4 frontend for Reel Reports, a document-to-video platform.
 - **Landing page** (`/`) with how-it-works, video types, brand kits and pricing.
 - **Auth** (`/login`, `/signup`), cookie session handled by the API.
 - **Three ways to make a video**, each its own page in the sidebar:
-  - **Direct Video** (`/app/direct`): send a topic or document, get a finished MP4 on the page.
-  - **DIY Video** (`/app/diy`): pauses for script and storyboard review before anything renders.
+  - **Direct Video** (`/app/direct`): upload a document, get a finished MP4 on the page.
+  - **DIY Video** (`/app/diy`): upload a document; it pauses for script and storyboard review before anything renders.
   - **Chat** (`/app/chat`, `/app/chat/[id]`): talk it through with the assistant, then generate from the conversation. Conversations are listed under Chats history.
   - Three video types on every page: Motion graphics, Cinematic, Avatar based. Settings: format, length, voice (with audio previews), captions, brand kit.
 - **Project review** (`/app/projects/[id]`): pipeline progress, script editor, storyboard editor with scene previews, final player.
