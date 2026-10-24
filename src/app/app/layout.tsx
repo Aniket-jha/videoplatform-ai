@@ -34,6 +34,8 @@ function Shell({ children }: { children: React.ReactNode }) {
   const path = usePathname();
   const [open, setOpen] = useState(false);
   useEffect(() => setOpen(false), [path]);
+  // The video editor uses the whole screen.
+  if (path.endsWith("/edit")) return <>{children}</>;
 
   return (
     <div className="min-h-screen lg:grid lg:grid-cols-[288px_1fr]">

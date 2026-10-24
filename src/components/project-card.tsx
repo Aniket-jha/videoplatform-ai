@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import clsx from "clsx";
-import { AlertTriangle, ArrowRight, Check, Download, Film, RefreshCw } from "lucide-react";
+import { AlertTriangle, ArrowRight, Check, Download, Film, RefreshCw, Scissors } from "lucide-react";
 import { api, fmtSeconds, type ChatProject } from "@/lib/api";
 import { Button } from "./ui";
 import { PIPELINE, StatusBadge, isWorking, stepOf } from "./status";
@@ -57,7 +57,8 @@ export function ProjectCard({ p, onChanged }: { p: ChatProject; onChanged: () =>
         {p.status === "done" && (
           <>
             <span className="flex items-center gap-1 text-xs text-emerald-700"><Check className="size-3.5" /> Ready · {fmtSeconds(p.durationSec ?? 0)}</span>
-            <Button size="sm" variant="secondary" className="ml-auto" href={`/api/projects/${p.id}/video?download=1`}><Download className="size-4" /> Download</Button>
+            <Button size="sm" variant="secondary" className="ml-auto" href={`/app/projects/${p.id}/edit`}><Scissors className="size-4" /> Edit</Button>
+            <Button size="sm" variant="secondary" href={`/api/projects/${p.id}/video?download=1`}><Download className="size-4" /> Download</Button>
           </>
         )}
         <Link href={`/app/projects/${p.id}`} className={clsx("text-xs font-medium text-brand hover:underline", p.status !== "done" && "ml-auto")}>Open project</Link>

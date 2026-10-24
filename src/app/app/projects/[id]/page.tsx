@@ -2,7 +2,7 @@
 import { use, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import clsx from "clsx";
-import { AlertTriangle, Check, ChevronLeft, Download, FileText, RefreshCw, Sparkles, Trash2, Wand2 } from "lucide-react";
+import { AlertTriangle, Check, ChevronLeft, Download, Scissors, FileText, RefreshCw, Sparkles, Trash2, Wand2 } from "lucide-react";
 import { api, fmtSeconds, type ProjectDetail, type ProjectEvent, type Scene, type Script } from "@/lib/api";
 import { useSession } from "@/components/session";
 import { Badge, Button, Card, ErrorNote, Spinner } from "@/components/ui";
@@ -79,7 +79,8 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
         </div>
         <div className="flex gap-2">
           {p.status === "failed" && <Button variant="secondary" loading={busy === "retry"} onClick={() => act("retry", () => api(`/projects/${id}/retry`, { method: "POST" }))}><RefreshCw className="size-4" /> Retry</Button>}
-          {p.hasVideo && <Button href={`/api/projects/${id}/video?download=1`}><Download className="size-4" /> Download MP4</Button>}
+          {p.hasVideo && p.status === "done" && <Button href={`/app/projects/${id}/edit`}><Scissors className="size-4" /> Edit video</Button>}
+          {p.hasVideo && <Button variant={p.status === "done" ? "secondary" : "primary"} href={`/api/projects/${id}/video?download=1`}><Download className="size-4" /> Download MP4</Button>}
           <Button variant="ghost" aria-label="Delete project" loading={busy === "delete"} disabled={isWorking(p.status)}
             onClick={() => { if (confirm("Delete this project and its video?")) void act("delete", async () => { await api(`/projects/${id}`, { method: "DELETE" }); router.push("/app/media"); }); }}>
             <Trash2 className="size-4" />

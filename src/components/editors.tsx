@@ -67,12 +67,12 @@ export function ScriptEditor({ script, onChange }: { script: Script; onChange: (
   );
 }
 
-const TYPE_LABEL: Record<VisualType, string> = {
+export const TYPE_LABEL: Record<VisualType, string> = {
   title: "Title card", bullets: "Bullet points", stat: "Big number", bar_chart: "Bar chart",
   quote: "Quote", timeline: "Timeline", comparison: "Comparison", closing: "Closing card",
 };
 
-function withDefaults(v: Visual, type: VisualType): Visual {
+export function withDefaults(v: Visual, type: VisualType): Visual {
   const n: Visual = { ...v, type };
   if (type === "bullets" && !n.bullets) n.bullets = ["First point", "Second point"];
   if (type === "stat" && !n.stat) n.stat = { value: 100, prefix: "", suffix: "%", label: "What this number means" };
@@ -122,7 +122,7 @@ export function StoryboardEditor({ scenes, onChange, theme, aspect, brand }: { s
   );
 }
 
-function VisualFields({ v, onChange }: { v: Visual; onChange: (v: Visual) => void }) {
+export function VisualFields({ v, onChange }: { v: Visual; onChange: (v: Visual) => void }) {
   const head = (
     <div className="grid gap-3 sm:grid-cols-2">
       <div><Label>On-screen heading</Label><Input value={v.heading} onChange={(e) => onChange({ ...v, heading: e.target.value })} /></div>
