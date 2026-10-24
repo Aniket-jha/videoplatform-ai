@@ -1,6 +1,7 @@
 "use client";
 import { useRef, useState } from "react";
-import { Film, Search, Upload, X } from "lucide-react";
+import { Film, Search, Sparkles, Upload, X } from "lucide-react";
+import { useSession } from "../session";
 import { api } from "@/lib/api";
 import { Button, ErrorNote, Input, Spinner } from "../ui";
 
@@ -15,7 +16,22 @@ export function MediaPicker({ projectId, aspect, initialQuery, onPick, onClose }
   const [results, setResults] = useState<Result[] | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [prompt, setPrompt] = useState(initialQuery);
   const fileRef = useRef<HTMLInputElement>(null);
+  const { user, meta, refresh } = useSession();
+  const canClip = !!meta.providers.video && meta.plans[user.plan].styles.includes("cinematic");
+  const clipCredits = 6 * (meta.styles.cinematic?.multiplier ?? 10);
+
+  async function generate(kind: "image" | "video") {
+    if (!prompt.trim()) return;
+    setBusy(`gen-${kind}`);
+    setError("");
+    try {
+      const m = await api<{ kind: "image" | "video"; url: string }>(`/editor/${projectId}/generate`, { method: "POST", json: { prompt, kind, aspect, seconds: 6 } });
+      if (kind === "video") void refresh();
+      onPick(m);
+    } catch (e) { setError((e as Error).message); setBusy(null); }
+  }
 
   async function search(video: boolean) {
     if (!q.trim()) return;
@@ -68,6 +84,17 @@ export function MediaPicker({ projectId, aspect, initialQuery, onPick, onClose }
             <input ref={fileRef} type="file" hidden accept=".png,.jpg,.jpeg,.webp,.mp4,.mov,.webm,.m4v"
               onChange={(e) => { const f = e.target.files?.[0]; if (f) void uploadFile(f); e.target.value = ""; }} />
           </div>
+          {meta.providers.image && (
+            <div className="rounded-xl border border-indigo-200 bg-indigo-50/50 p-3">
+              <p className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-brand"><Sparkles className="size-4" /> Generate with AI</p>
+              <div className="flex flex-wrap gap-2">
+                <Input value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="Describe the image, e.g. “team planning around a whiteboard”" className="min-w-0 flex-1" />
+                <Button loading={busy === "gen-image"} disabled={!!busy} onClick={() => generate("image")}>Generate image</Button>
+                {canClip && <Button variant="secondary" loading={busy === "gen-video"} disabled={!!busy} onClick={() => generate("video")} title={`6-second AI clip · ${clipCredits} credits`}>AI clip · {clipCredits} cr</Button>}
+              </div>
+              <p className="mt-1.5 text-xs text-muted">Using {meta.providers.image}{busy === "gen-video" ? " · clips take 1–3 minutes" : ""}</p>
+            </div>
+          )}
           <ErrorNote>{error}</ErrorNote>
         </div>
         <div className="min-h-40 flex-1 overflow-y-auto px-5 pb-5">

@@ -15,7 +15,9 @@ export type Meta = {
   voices: Record<string, string>;
   themes: string[];
   fonts: string[];
-  integrations: Record<"claude" | "elevenlabs" | "macSay" | "neuralVoice" | "pexels" | "heygen" | "veo" | "stripe", boolean>;
+  integrations: Record<"claude" | "elevenlabs" | "macSay" | "neuralVoice" | "pexels" | "heygen" | "veo" | "fal" | "openai" | "gemini" | "stripe", boolean>;
+  /** Active AI generators (null when none is configured). */
+  providers: { image: string | null; video: string | null };
 };
 
 export type Script = { title: string; summary: string; sections: { heading: string; narration: string }[] };
