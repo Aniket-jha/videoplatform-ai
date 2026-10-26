@@ -28,7 +28,7 @@ It expects the backend checked out at `../server`; otherwise set `REMOTION_SRC=/
 
 ## Deploy
 
-See [DEPLOYMENT.md in the backend repo](https://github.com/Aniket-jha/videoplatform-aibackend/blob/main/DEPLOYMENT.md). In short: import this repo into Vercel and set `API_URL` to your API's URL before the first build.
+See [DEPLOYMENT.md in the backend repo](https://github.com/Aniket-jha/videoplatform-aibackend/blob/main/DEPLOYMENT.md). In short: import this repo into Vercel. Production builds use the live API at `https://api.yourwault.com`; set `API_URL` in Vercel only to point at a different backend (it's read at build time).
 
 ## Run locally
 
@@ -45,5 +45,5 @@ npm run dev
 Open http://localhost:3000. Requests to `/api/*` and `/storage/*` are proxied to the backend (see `next.config.ts`), so auth cookies stay first-party. Point it at another backend with `API_URL`:
 
 ```bash
-API_URL=https://api.example.com npm run dev
+API_URL=https://api.yourwault.com npm run dev
 ```
